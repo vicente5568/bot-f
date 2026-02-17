@@ -1,4 +1,5 @@
 require('dotenv').config();
+const fs = require('fs');
 const {
   Client,
   GatewayIntentBits,
@@ -17,15 +18,15 @@ const client = new Client({
   ]
 });
 
-// 🔥 PON TUS IDS AQUÍ
+// 🔥 PON TUS IDS
 const CANAL_PEDIDOS = "1473151288316264621";
 const CANAL_MODELOS = "1473171713624768577";
 const CANAL_TEMAS = "1473172839405195355";
 const CATEGORIA_ID = "1473173468693397514";
 
-// Memoria temporal
-const modelos = {};
-const temas = {};
+// Cargar datos guardados
+let modelos = JSON.parse(fs.readFileSync('./modelos.json'));
+let temas = JSON.parse(fs.readFileSync('./temas.json'));
 
 client.once('clientReady', () => {
   console.log(`✅ Bot listo como ${client.user.tag}`);
@@ -41,7 +42,9 @@ client.on('messageCreate', async (message) => {
     if (!imagen) return;
 
     modelos[numero] = imagen.url;
-    message.reply(`✅ Modelo ${numero} guardado.`);
+    fs.writeFileSync('./modelos.json', JSON.stringify(modelos, null, 2));
+
+    return message.reply(`✅ Modelo ${numero} guardado permanentemente.`);
   }
 
   // 📁 GUARDAR TEMAS
@@ -51,7 +54,9 @@ client.on('messageCreate', async (message) => {
     if (!imagen) return;
 
     temas[numero] = imagen.url;
-    message.reply(`✅ Tema ${numero} guardado.`);
+    fs.writeFileSync('./temas.json', JSON.stringify(temas, null, 2));
+
+    return message.reply(`✅ Tema ${numero} guardado permanentemente.`);
   }
 
   // 📦 CREAR PEDIDO
@@ -71,54 +76,40 @@ client.on('messageCreate', async (message) => {
       return message.reply("❌ Ese tema no existe.");
     }
 
-    try {
-      const nuevoCanal = await message.guild.channels.create({
-        name: nombre,
-        type: ChannelType.GuildText,
-        parent: CATEGORIA_ID, // 🔥 SE CREA EN LA CATEGORÍA
-        permissionOverwrites: [
-          {
-            id: message.guild.id,
-            allow: [PermissionsBitField.Flags.ViewChannel],
-          }
-        ]
-      });
+    const nuevoCanal = await message.guild.channels.create({
+      name: nombre,
+      type: ChannelType.GuildText,
+      parent: CATEGORIA_ID,
+      permissionOverwrites: [
+        {
+          id: message.guild.id,
+          allow: [PermissionsBitField.Flags.ViewChannel],
+        }
+      ]
+    });
 
-      const boton = new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-          .setCustomId('cerrar_canal')
-          .setLabel('Cerrar Canal')
-          .setStyle(ButtonStyle.Danger)
-      );
+    const boton = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId('cerrar_canal')
+        .setLabel('Cerrar Canal')
+        .setStyle(ButtonStyle.Danger)
+    );
 
-      // 📌 MODELO
-      await nuevoCanal.send(`📌 **Modelo seleccionado: ${modeloNum}**`);
-      await nuevoCanal.send({
-        files: [modelos[modeloNum]]
-      });
+    await nuevoCanal.send(`📌 **Modelo seleccionado: ${modeloNum}**`);
+    await nuevoCanal.send({ files: [modelos[modeloNum]] });
 
-      // 📝 TEMA
-      await nuevoCanal.send(`📝 **Tema seleccionado: ${temaNum}**`);
-      await nuevoCanal.send({
-        files: [temas[temaNum]]
-      });
+    await nuevoCanal.send(`📝 **Tema seleccionado: ${temaNum}**`);
+    await nuevoCanal.send({ files: [temas[temaNum]] });
 
-      await nuevoCanal.send({
-        content: "🔒 Presiona el botón para cerrar este canal.",
-        components: [boton]
-      });
-
-    } catch (error) {
-      console.log(error);
-      message.reply("❌ Error al crear el canal.");
-    }
+    await nuevoCanal.send({
+      content: "🔒 Presiona el botón para cerrar este canal.",
+      components: [boton]
+    });
   }
 });
 
-// 🔴 BOTÓN CERRAR
 client.on('interactionCreate', async interaction => {
   if (!interaction.isButton()) return;
-
   if (interaction.customId === 'cerrar_canal') {
     await interaction.channel.delete();
   }
