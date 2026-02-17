@@ -97,6 +97,8 @@ client.on('interactionCreate', async interaction => {
         }, 1500);
     }
 });
+ const CANAL_ID = "1473151288316264621";
 
 client.login(process.env.TOKEN);
+
 
