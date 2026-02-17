@@ -1,104 +1,91 @@
-require('dotenv').config({ path: './config.env' });
-
+require('dotenv').config();
 const {
-    Client,
-    GatewayIntentBits,
-    ChannelType,
-    ActionRowBuilder,
-    ButtonBuilder,
-    ButtonStyle
+  Client,
+  GatewayIntentBits,
+  ChannelType,
+  PermissionsBitField,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle
 } = require('discord.js');
 
 const client = new Client({
-    intents: [
-        GatewayIntentBits.Guilds,
-        GatewayIntentBits.GuildMessages,
-        GatewayIntentBits.MessageContent
-    ]
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent
+  ]
 });
 
-client.once('ready', () => {
-    console.log(`✅ Bot listo como ${client.user.tag}`);
+// 🔥 PON AQUÍ EL ID DEL CANAL DONDE SE ENVIARÁ EL MENSAJE
+const CANAL_ID = "1473151288316264621";
+
+client.once('clientReady', () => {
+  console.log(`Bot listo como ${client.user.tag}`);
 });
 
 client.on('messageCreate', async (message) => {
-    if (message.author.bot) return;
+  if (message.author.bot) return;
+  if (message.channel.id !== CANAL_ID) return;
 
-    // 🔒 Solo funciona en el canal configurado
-    if (message.channel.id !== process.env.CANAL_CREAR_ID) return;
+  // Espera formato: Nombre (con foto adjunta) 12 23
+  const partes = message.content.trim().split(" ");
 
-    // Debe tener imagen
-    if (message.attachments.size === 0) {
-        return message.reply("⚠ Debes adjuntar una imagen.");
-    }
+  if (partes.length < 3) return;
 
-    const partes = message.content.trim().split(/\s+/);
+  const modelo = partes[partes.length - 2];
+  const tema = partes[partes.length - 1];
+  const nombre = partes.slice(0, partes.length - 2).join(" ").toLowerCase();
 
-    if (partes.length < 3) {
-        return message.reply("⚠ Formato incorrecto. Usa: Nombre Modelo Tema");
-    }
+  if (!message.attachments.first()) {
+    return message.reply("Debes enviar una imagen.");
+  }
 
-    const nombre = partes[0].toLowerCase();
-    const modelo = partes[1];
-    const tema = partes[2];
+  try {
+    const nuevoCanal = await message.guild.channels.create({
+      name: nombre,
+      type: ChannelType.GuildText,
+      permissionOverwrites: [
+        {
+          id: message.guild.id,
+          allow: [PermissionsBitField.Flags.ViewChannel],
+        }
+      ]
+    });
 
-    if (isNaN(modelo) || isNaN(tema)) {
-        return message.reply("⚠ Modelo y tema deben ser números.");
-    }
+    // Crear botón cerrar
+    const boton = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId('cerrar_canal')
+        .setLabel('Cerrar Canal')
+        .setStyle(ButtonStyle.Danger)
+    );
 
-    try {
-        // 📁 Crear canal
-        const nuevoCanal = await message.guild.channels.create({
-            name: nombre,
-            type: ChannelType.GuildText,
-            parent: process.env.CATEGORIA_ID || null
-        });
+    await nuevoCanal.send({
+      content: `📷 Imagen:`,
+      files: [message.attachments.first().url]
+    });
 
-        // 🔘 Botón cerrar
-        const boton = new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-                .setCustomId("cerrar_canal")
-                .setLabel("🔒 Cerrar Canal")
-                .setStyle(ButtonStyle.Danger)
-        );
+    await nuevoCanal.send(`Modelo: ${modelo}`);
+    await nuevoCanal.send(`Tema de letra: ${tema}`);
 
-        // 📷 Enviar imagen
-        await nuevoCanal.send({
-            content: `📷 Imagen de **${nombre}**`,
-            files: [message.attachments.first().url]
-        });
+    await nuevoCanal.send({
+      content: "Presiona el botón para cerrar este canal.",
+      components: [boton]
+    });
 
-        // 📌 Datos separados
-        await nuevoCanal.send(`🧩 **Modelo:** ${modelo}`);
-        await nuevoCanal.send(`🔤 **Tema de letra:** ${tema}`);
-
-        // 🔒 Botón
-        await nuevoCanal.send({
-            content: "Presiona el botón para cerrar el canal.",
-            components: [boton]
-        });
-
-        await message.reply(`✅ Canal creado: ${nuevoCanal}`);
-
-    } catch (error) {
-        console.error("Error al crear canal:", error);
-    }
+  } catch (error) {
+    console.log(error);
+  }
 });
 
-// 🔘 Evento botón
+// Botón cerrar
 client.on('interactionCreate', async interaction => {
-    if (!interaction.isButton()) return;
+  if (!interaction.isButton()) return;
 
-    if (interaction.customId === "cerrar_canal") {
-        await interaction.reply({ content: "🔒 Cerrando canal...", ephemeral: true });
-
-        setTimeout(() => {
-            interaction.channel.delete().catch(console.error);
-        }, 1500);
-    }
+  if (interaction.customId === 'cerrar_canal') {
+    await interaction.channel.delete();
+  }
 });
- const CANAL_ID = "1473151288316264621";
 
 client.login(process.env.TOKEN);
-
-
